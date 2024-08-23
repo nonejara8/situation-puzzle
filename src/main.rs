@@ -21,7 +21,16 @@ impl EventHandler for Bot {
             if let Err(e) = msg.channel_id.say(&ctx.http, "typing").await {
                 error!("Error sending message: {:?}", e);
             }
-            msg.channel_id.start_typing(&ctx.http);
+
+            if let Err(e) = msg.channel_id.broadcast_typing(&ctx.http).await {
+                error!("Error broadcasting typing: {:?}", e);
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
+            if let Err(e) = msg.channel_id.say(&ctx.http, "〇〇が入力中").await {
+                error!("Error sending message: {:?}", e);
+            }
         }
     }
 
