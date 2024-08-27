@@ -221,8 +221,16 @@
             <mxPoint x="1600" y="1330" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="f3MCCMU7Drk_aGL3dUXo-28" value="" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;fontSize=16.7;fontFamily=Liberation Serif;fillColor=#ffffff;strokeColor=#fe5900;rounded=1;strokeWidth=3;spacing=3.8;arcSize=12;" vertex="1" parent="1">
-          <mxGeometry x="996" y="1590" width="120" height="80" as="geometry" />
+        <mxCell id="f3MCCMU7Drk_aGL3dUXo-31" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="f3MCCMU7Drk_aGL3dUXo-28">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1056" y="1873" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="f3MCCMU7Drk_aGL3dUXo-28" value="ゲーム終了です。&lt;br&gt;総問題数：N&lt;br&gt;１位：〇〇&lt;br&gt;２位：△△&lt;br&gt;３位：■■" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;fontSize=16.7;fontFamily=Liberation Serif;fillColor=#ffffff;strokeColor=#fe5900;rounded=1;strokeWidth=3;spacing=3.8;arcSize=12;" vertex="1" parent="1">
+          <mxGeometry x="954" y="1593" width="204" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="f3MCCMU7Drk_aGL3dUXo-33" value="ゲーム終了" style="html=1;overflow=block;blockSpacing=1;whiteSpace=wrap;rounded=1;arcSize=50;fontSize=13;fontFamily=Lucid JP;fontColor=#ffffff;align=center;spacing=3.8;strokeOpacity=0;fillOpacity=100;fillColor=#ff741d;strokeWidth=0.8;lucidId=2_46xnNCwEn1;" vertex="1" parent="1">
+          <mxGeometry x="997" y="1870.0000000000005" width="120" height="60" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
