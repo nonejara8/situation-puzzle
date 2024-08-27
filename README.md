@@ -17,4 +17,8 @@ For more information please refer to the [Discord docs](https://discord.com/deve
 
 ## how to deploy
 
+- デプロイ
 `cargo shuttle deploy`
+
+- ローカルで実行
+`cargo shuttle run`
