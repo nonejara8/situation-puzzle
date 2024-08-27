@@ -1,3 +1,5 @@
+mod handlers;
+
 use anyhow::Context as _;
 use serenity::all::{GuildId, Interaction};
 use serenity::async_trait;
@@ -8,7 +10,7 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use shuttle_runtime::SecretStore;
-use tracing::{error, info};
+use tracing::info;
 
 struct Bot {
     discord_guild_id: GuildId,
@@ -69,23 +71,7 @@ impl EventHandler for Bot {
     }
 
     async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!hello" {
-            if let Err(e) = msg.channel_id.say(&ctx.http, "world!").await {
-                error!("Error sending message: {:?}", e);
-            }
-        }
-
-        if msg.content == "!typing" {
-            if let Err(e) = msg.channel_id.broadcast_typing(&ctx.http).await {
-                error!("Error broadcasting typing: {:?}", e);
-            }
-
-            tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
-            if let Err(e) = msg.channel_id.say(&ctx.http, "〇〇が入力中").await {
-                error!("Error sending message: {:?}", e);
-            }
-        }
+        handlers::handle_message(ctx, msg).await;
     }
 }
 
