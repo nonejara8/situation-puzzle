@@ -1,9 +1,11 @@
+mod api;
+mod chat_completion;
 mod handlers;
 
 use std::sync::Mutex;
 
 use anyhow::Context as _;
-use serenity::all::{CommandInteraction, GuildId, Interaction, UserId};
+use serenity::all::{CommandInteraction, ComponentInteraction, GuildId, Interaction, UserId};
 use serenity::async_trait;
 use serenity::builder::{
     CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
@@ -17,16 +19,22 @@ use serenity::prelude::*;
 use shuttle_runtime::SecretStore;
 use tracing::info;
 
+use crate::api::OpenAIClient;
+use crate::chat_completion::{
+    ChatCompletionMessage, ChatCompletionRequest, ChatCompletionResponse, Content, MessageRole,
+};
 struct Bot {
     discord_guild_id: GuildId,
     join_users: Mutex<Vec<UserId>>,
+    openai_api_key: String,
 }
 
 impl Bot {
-    fn new(discord_guild_id: GuildId) -> Self {
+    fn new(discord_guild_id: GuildId, openai_api_key: String) -> Self {
         Self {
             discord_guild_id,
             join_users: Mutex::new(vec![]),
+            openai_api_key,
         }
     }
 }
@@ -41,7 +49,6 @@ impl EventHandler for Bot {
             CreateCommand::new("start").description("ゲームスタート"), // ゲームスタート
             CreateCommand::new("collector").description("コレクター"), // コレクター
             CreateCommand::new("join").description("参加"),            // 参加
-            CreateCommand::new("show").description("参加者を表示"),    // 参加者を表示
             CreateCommand::new("typing")
                 .description("typingのコマンドです")
                 .add_option(CreateCommandOption::new(
@@ -63,7 +70,7 @@ impl EventHandler for Bot {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         match interaction {
             Interaction::Command(command) => handle_command(ctx, command, self).await,
-            // Interaction::Component(component) => handle_component(ctx, component).await,
+            Interaction::Component(component) => handle_component(ctx, component).await,
             _ => (),
         }
     }
@@ -76,7 +83,7 @@ impl EventHandler for Bot {
 async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
     let response_content = match command.data.name.as_str() {
         "play" => {
-            let button = CreateButton::new("button_id")
+            let button = CreateButton::new("button_1")
                 .label("Click me!")
                 .style(ButtonStyle::Primary);
 
@@ -100,14 +107,34 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
             let mut join_users = bot.join_users.lock().unwrap();
             join_users.push(user_id);
             format!(
-                "{} さん(ID: {})が参加しました。\n現在の参加者数は{}人です。",
+                "{} さん(ID: {})が参加しました。\n現在の参加者数は{}人です。\nゲームを開始するには\\startを入力してください",
                 user_name,
                 user_id,
                 join_users.len()
             )
         }
-        "show" => {
-            format!("{:?}", bot.join_users)
+        "start" => {
+            let client = OpenAIClient::new(bot.openai_api_key.clone());
+            let response = client.send_request().await;
+            "".to_owned()
+            // let client = OpenAIClient::new(bot.openai_api_key.clone());
+            // let request = ChatCompletionRequest::new(
+            //     "gpt-4o-mini".to_string(),
+            //     vec![ChatCompletionMessage {
+            //         role: MessageRole::system,
+            //         content: Content::Text("あなた  はゲームのマスターです。".to_owned()),
+            //     }],
+            // );
+
+            // let response: Result<ChatCompletionResponse, anyhow::Error> =
+            //     client.post(&request).await;
+            // match response {
+            //     Ok(res) => res.choices[0].to_owned(),
+            //     Err(e) => {
+            //         println!("エラーが発生しました: {:?}", e);
+            //         "エラーが発生しました".to_owned()
+            //     }
+            // }
         }
         "typing" => {
             let argument = command
@@ -133,6 +160,22 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
     }
 }
 
+async fn handle_component(ctx: Context, component: ComponentInteraction) {
+    let response_content = match component.data.custom_id.as_str() {
+        "button_1" => "ボタン1が押されました",
+        "button_2" => "ボタン2が押されました",
+        _ => "未知のボタンが押されました",
+    };
+
+    let builder = CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new().content(response_content),
+    );
+
+    if let Err(why) = component.create_response(&ctx.http, builder).await {
+        println!("Cannot respond to component interaction: {}", why);
+    }
+}
+
 #[shuttle_runtime::main]
 async fn serenity(
     #[shuttle_runtime::Secrets] secrets: SecretStore,
@@ -149,10 +192,15 @@ async fn serenity(
         .get("DISCORD_GUILD_ID")
         .context("'DISCORD_GUILD_ID' was not found")?;
 
+    let openai_api_key = secrets
+        .get("OPENAI_API_KEY")
+        .context("'OPENAI_API_KEY' was not found")?;
+
     let client = Client::builder(&token, intents)
-        .event_handler(Bot::new(GuildId::new(
-            discord_guild_id.parse::<u64>().unwrap(),
-        )))
+        .event_handler(Bot::new(
+            GuildId::new(discord_guild_id.parse::<u64>().unwrap()),
+            openai_api_key.to_string(),
+        ))
         .await
         .expect("Err creating client");
 
