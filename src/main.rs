@@ -1,15 +1,14 @@
 mod api;
-mod chat_completion;
 mod handlers;
 
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 
 use anyhow::Context as _;
 use serenity::all::{CommandInteraction, ComponentInteraction, GuildId, Interaction, UserId};
 use serenity::async_trait;
 use serenity::builder::{
     CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
-    CreateInteractionResponseMessage,
+    CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
 };
 
 use serenity::model::application::ButtonStyle;
@@ -20,9 +19,6 @@ use shuttle_runtime::SecretStore;
 use tracing::info;
 
 use crate::api::OpenAIClient;
-use crate::chat_completion::{
-    ChatCompletionMessage, ChatCompletionRequest, ChatCompletionResponse, Content, MessageRole,
-};
 struct Bot {
     discord_guild_id: GuildId,
     join_users: Mutex<Vec<UserId>>,
@@ -49,6 +45,28 @@ impl EventHandler for Bot {
             CreateCommand::new("start").description("ゲームスタート"), // ゲームスタート
             CreateCommand::new("collector").description("コレクター"), // コレクター
             CreateCommand::new("join").description("参加"),            // 参加
+            CreateCommand::new("question")
+                .description("質問を送信します")
+                .add_option(
+                    CreateCommandOption::new(
+                        serenity::all::CommandOptionType::String,
+                        "質問の内容",
+                        "質問の内容を入力してください",
+                    )
+                    .max_length(100)
+                    .required(true),
+                ),
+            CreateCommand::new("answer")
+                .description("回答を送信します")
+                .add_option(
+                    CreateCommandOption::new(
+                        serenity::all::CommandOptionType::String,
+                        "回答の内容",
+                        "回答の内容を入力してください",
+                    )
+                    .max_length(100)
+                    .required(true),
+                ),
             CreateCommand::new("typing")
                 .description("typingのコマンドです")
                 .add_option(CreateCommandOption::new(
@@ -81,7 +99,7 @@ impl EventHandler for Bot {
 }
 
 async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
-    let response_content = match command.data.name.as_str() {
+    match command.data.name.as_str() {
         "play" => {
             let button = CreateButton::new("button_1")
                 .label("Click me!")
@@ -99,24 +117,36 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
                 println!("Error sending interaction response: {:?}", e);
             }
 
-            "buttonが押されました".to_owned()
+            // フォローアップメッセージを送信
+            if let Err(e) = command
+                .create_followup(
+                    &ctx.http,
+                    CreateInteractionResponseFollowup::new().content("buttonが押されました"),
+                )
+                .await
+            {
+                println!("Error sending follow-up message: {:?}", e);
+            }
         }
         "join" => {
             let user_id = command.user.id;
             let user_name = command.user.name.clone();
-            let mut join_users = bot.join_users.lock().unwrap();
+            let mut join_users = bot.join_users.lock().await;
             join_users.push(user_id);
-            format!(
+            let response_content = format!(
                 "{} さん(ID: {})が参加しました。\n現在の参加者数は{}人です。\nゲームを開始するには\\startを入力してください",
                 user_name,
                 user_id,
                 join_users.len()
-            )
+            );
+
+            respond_to_command(&ctx, &command, response_content).await;
         }
         "start" => {
             let client = OpenAIClient::new(bot.openai_api_key.clone());
             let response = client.send_request().await;
-            "".to_owned()
+            let response_content = "問題です".to_string();
+            respond_to_command(&ctx, &command, response_content).await;
             // let client = OpenAIClient::new(bot.openai_api_key.clone());
             // let request = ChatCompletionRequest::new(
             //     "gpt-4o-mini".to_string(),
@@ -147,16 +177,21 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
             let value = argument.unwrap().value;
             let mode = value.as_bool().unwrap();
 
-            format!("{}が選択されました", mode)
-        }
-        _ => "コマンドが見つかりません".to_owned(),
-    };
+            let response_content = format!("{}が選択されました", mode);
 
+            respond_to_command(&ctx, &command, response_content).await;
+        }
+        _ => {}
+    };
+}
+
+async fn respond_to_command(ctx: &Context, command: &CommandInteraction, response_content: String) {
     let data = CreateInteractionResponseMessage::new().content(response_content);
     let builder = CreateInteractionResponse::Message(data);
 
     if let Err(why) = command.create_response(&ctx.http, builder).await {
         println!("Cannot respond to slash command: {}", why);
+        println!("command.data: {:?}", command.data);
     }
 }
 

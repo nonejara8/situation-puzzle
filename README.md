@@ -22,3 +22,7 @@ For more information please refer to the [Discord docs](https://discord.com/deve
 
 - ローカルで実行
 `cargo shuttle run`
+
+## 参考
+### プロンプトエンジニアリング
+https://www.promptingguide.ai/
