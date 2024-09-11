@@ -16,7 +16,7 @@ impl OpenAIClient {
         }
     }
 
-    pub async fn send_request(&self) -> Result<Value, reqwest::Error> {
+    pub async fn send_request(&self) -> Result<String, anyhow::Error> {
         let client = Client::new();
         let body = json!({
             "model": "gpt-4o-mini",
@@ -38,40 +38,22 @@ impl OpenAIClient {
         println!("Headers: {:?}", headers);
         println!("Response JSON: {}", json);
 
-        Ok(json)
-    }
-
-    async fn build_request(&self, method: Method) -> reqwest::RequestBuilder {
-        let url = format!("{}/chat/completions", self.api_base);
-        let client = Client::new();
-
-        let request = client
-            .request(method, url)
-            .header("Authorization", format!("Bearer {}", self.api_key));
-
-        request
-    }
-
-    pub async fn post<T: serde::de::DeserializeOwned>(
-        &self,
-        body: &impl serde::ser::Serialize,
-    ) -> Result<T, Error> {
-        let request: RequestBuilder = self.build_request(Method::POST).await;
-        let request = request.json(body);
-        let response = request.send().await?;
-        let status = response.status();
-
-        println!("response: {:?}", response);
-
         if status.is_success() {
-            let parsed: T = response.json().await?;
-            Ok(parsed)
+            let message = json
+                .get("choices")
+                .unwrap()
+                .get(0)
+                .unwrap()
+                .get("message")
+                .unwrap()
+                .get("content")
+                .unwrap();
+            Ok(message.to_string())
         } else {
-            let error_message = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            Err(anyhow::anyhow!("ここでエラー：{}", error_message))
+            Err(anyhow::anyhow!(
+                "エラーが発生しました: ステータスコード {}",
+                status
+            ))
         }
     }
 }

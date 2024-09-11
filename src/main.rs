@@ -41,10 +41,9 @@ impl EventHandler for Bot {
         info!("{} is connected!", ready.user.name);
 
         let commands = vec![
-            CreateCommand::new("play").description("参加⇔退出ボタン"), // 参加⇔退出ボタン
-            CreateCommand::new("start").description("ゲームスタート"), // ゲームスタート
+            CreateCommand::new("play").description("ゲームスタート"), // ゲームスタート
             CreateCommand::new("collector").description("コレクター"), // コレクター
-            CreateCommand::new("join").description("参加"),            // 参加
+            CreateCommand::new("join").description("参加"),           // 参加
             CreateCommand::new("question")
                 .description("質問を送信します")
                 .add_option(
@@ -100,7 +99,7 @@ impl EventHandler for Bot {
 
 async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
     match command.data.name.as_str() {
-        "play" => {
+        "demo" => {
             let button = CreateButton::new("button_1")
                 .label("Click me!")
                 .style(ButtonStyle::Primary);
@@ -142,29 +141,23 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
 
             respond_to_command(&ctx, &command, response_content).await;
         }
-        "start" => {
+        "play" => {
             let client = OpenAIClient::new(bot.openai_api_key.clone());
             let response = client.send_request().await;
-            let response_content = "問題です".to_string();
-            respond_to_command(&ctx, &command, response_content).await;
-            // let client = OpenAIClient::new(bot.openai_api_key.clone());
-            // let request = ChatCompletionRequest::new(
-            //     "gpt-4o-mini".to_string(),
-            //     vec![ChatCompletionMessage {
-            //         role: MessageRole::system,
-            //         content: Content::Text("あなた  はゲームのマスターです。".to_owned()),
-            //     }],
-            // );
 
-            // let response: Result<ChatCompletionResponse, anyhow::Error> =
-            //     client.post(&request).await;
-            // match response {
-            //     Ok(res) => res.choices[0].to_owned(),
-            //     Err(e) => {
-            //         println!("エラーが発生しました: {:?}", e);
-            //         "エラーが発生しました".to_owned()
-            //     }
-            // }
+            let mut message = "問題です\n".to_string();
+
+            if let Ok(response) = response {
+                message.push_str(&response);
+                respond_to_command(&ctx, &command, message).await;
+            } else {
+                respond_to_command(
+                    &ctx,
+                    &command,
+                    "APIの返却値取得においてエラーが発生しました".to_string(),
+                )
+                .await;
+            }
         }
         "typing" => {
             let argument = command
