@@ -1,3 +1,26 @@
+#[async_trait]
+impl EventHandler for Bot {
+    async fn ready(&self, ctx: Context, ready: Ready) {
+        info!("{} is connected!", ready.user.name);
+
+        let commands = vec![CreateCommand::new("typing")
+            .description("typingのコマンドです")
+            .add_option(CreateCommandOption::new(
+                serenity::all::CommandOptionType::Boolean,
+                "mode",
+                "ソロモードはtrue、マルチモードはfalse",
+            ))];
+
+        let commands = &self
+            .discord_guild_id
+            .set_commands(&ctx.http, commands)
+            .await
+            .unwrap();
+
+        info!("Registered commands: {:#?}", commands);
+    }
+}
+
 async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
     match command.data.name.as_str() {
         "demo" => {
@@ -27,6 +50,21 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
             {
                 println!("Error sending follow-up message: {:?}", e);
             }
+        }
+        "typing" => {
+            let argument = command
+                .data
+                .options
+                .iter()
+                .find(|opt| opt.name == "mode")
+                .cloned();
+
+            let value = argument.unwrap().value;
+            let mode = value.as_bool().unwrap();
+
+            let response_content = format!("{}が選択されました", mode);
+
+            respond_to_command(&ctx, &command, response_content).await;
         }
         _ => {}
     };
