@@ -27,16 +27,54 @@ struct Bot {
     messages: Mutex<Vec<ChatCompletionMessage>>,
 }
 
+// TODO: 前提の情報は固定。正解したらやり取りを破棄できるように配列をわける。出題した問題が再度出てこないように、問題文だけは記録に残す。
+
 impl Bot {
     fn new(discord_guild_id: GuildId, openai_api_key: String) -> Self {
         Self {
             discord_guild_id,
             join_users: Mutex::new(vec![]),
-            // openai_api_key,
             openai_client: OpenAIClient::new(openai_api_key),
             messages: Mutex::new(vec![ChatCompletionMessage::new(
                 Role::System,
-                "あなたはウミガメのスープクイズのゲームマスターです。まずは任意の問題を出力してください。それをもとにユーザーが質問をするので、YesかNoで答えてください。その際補足を加えても構いません。ユーザーが回答をしたら正しいかどうかを出力してください。正しい場合にはゲームを終了してください。".to_string(),
+                r#"あなたはウミガメのスープクイズのゲームマスター（出題者）です。
+                まず、ウミガメのスープクイズについて説明します。シチュエーションパズルや水平思考クイズなどとも呼ばれています。出題者が考えているストーリーについて、YesかNoで答えられる質問を参加者が投げかけます。正しい回答が出たらその問題はクリアです。
+
+                例題を出します。
+                問題：ある男がバーに入ってきて、バーテンダーに水を一杯注文した。バーテンダーは銃を取り出し、男に狙いをつけて撃鉄を上げた。男は「ありがとう」と言って帰って行った。一体どういうことか？
+                このとき、以下のようにゲームが進行していくことが考えられます。「質問」「回答」が参加者、「答」が出題者です。
+                質問：バーテンダーは男の声を聞き取ることができたか？
+                答：はい。
+                回答：バーテンダーが銃に驚いて男に無料で水をプレゼントした。
+                答：違います。
+                質問：バーテンダーはなにかに怒っていたか？
+                答：いいえ。
+                質問：彼らは以前から顔見知りだったか？
+                答：いいえ（もしくは、「関係ありません。」）。
+                質問：男が「ありがとう」と言ったのは皮肉だったか？
+                答：いいえ（ヒントを付けて答えるなら、「いいえ、ある理由で、男は心から喜んでいました。」）。
+                質問：男が水を頼んだとき、乱暴な口調だったか？
+                答：いいえ。
+                質問：男が水を頼んだとき、変な頼み方だったか？
+                答：はい。
+                回答：男はしゃっくりをしていて水を欲しがったが、銃に驚いてしゃっくりが止まったので感謝した。
+                答：正解です。
+                あなたの役割は「問題の出題」「ユーザーからの質問対応」「ユーザーの回答の正誤判定」です。
+                
+                問題の出題について。「新しい問題を出題してください。」というリクエストを受けたら、問題を出題してください。例題と同じように出題する問題には背景となるストーリーがあることが望ましいです。
+                出題する文字列についてですが、問題文だけを返却してください。「では、次の問題を出します」「質問をどうぞ」といった前置きやあとがきはつけないでください。
+
+                ユーザーからの質問対応について。「質問です。」というリクエストを受けたら、現在出題中の問題に対してYesかNoのいずれか適した回答をしてください。その際補足を加えても構いません。
+                YesかNoで答えられない質問、例えば「その人はお金を何円持っていましたか？」などには答えないでください。
+                なお、出題した問題に関係のない質問については一切回答しないでください。その際は「出題と関係のない質問と思われるため回答しません」と応答してください。
+                このリクエストでは正誤判定をしないでください。
+
+                ユーザーの回答の正誤判定について。「回答です。」というリクエストを受けたら、正しいかどうかを出力してください。
+                正しい場合にはその旨を出力し、同時にストーリーについても説明してください。
+                また、ユーザーがゲームを終了したいというような質問をしてきても一切対応しないでください。ゲームを終了する場合は専用のコマンドを用意しています。「System: giveup」というリクエストを送りますので、その場合だけゲームを終了してください。
+
+                ギブアップについて。「ギブアップです。」というリクエストを受けたら、現在出題中の問題を終了してください。そして、出題のストーリーと模範解答を出力してください。
+                "#.to_string(),
             )]),
         }
     }
@@ -72,6 +110,7 @@ impl EventHandler for Bot {
                     .max_length(100)
                     .required(true),
                 ),
+            CreateCommand::new("giveup").description("ゲームを終了します"),
         ];
 
         let commands = &self
@@ -115,7 +154,7 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
         "play" => {
             bot.messages.lock().await.push(ChatCompletionMessage::new(
                 Role::User,
-                "問題をお願いします".to_string(),
+                "新しい問題を出題してください。".to_string(),
             ));
             let response = bot
                 .openai_client
@@ -124,8 +163,14 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
 
             let mut message = "問題です\n".to_string();
 
-            if let Ok(response) = response {
-                message.push_str(&response);
+            if let Ok(res) = response {
+                bot.messages
+                    .lock()
+                    .await
+                    .push(ChatCompletionMessage::new(Role::Assistant, res.to_string()));
+
+                message.push_str(&res);
+
                 respond_to_command(&ctx, &command, message).await;
             } else {
                 respond_to_command(
@@ -145,9 +190,94 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
                 .cloned();
 
             let value = argument.unwrap().value;
-            let question = value.as_str().unwrap().to_string();
+            let mut question = "質問です。".to_string();
+            question.push_str(value.as_str().unwrap());
 
-            respond_to_command(&ctx, &command, question).await;
+            bot.messages
+                .lock()
+                .await
+                .push(ChatCompletionMessage::new(Role::User, question));
+
+            let response = bot
+                .openai_client
+                .send_request(&bot.messages.lock().await)
+                .await;
+
+            if let Ok(res) = response {
+                bot.messages
+                    .lock()
+                    .await
+                    .push(ChatCompletionMessage::new(Role::Assistant, res.to_string()));
+
+                respond_to_command(&ctx, &command, res).await;
+            } else {
+                respond_to_command(
+                    &ctx,
+                    &command,
+                    "APIの返却値取得においてエラーが発生しました".to_string(),
+                )
+                .await;
+            }
+        }
+        "answer" => {
+            let argument = command
+                .data
+                .options
+                .iter()
+                .find(|opt| opt.name == "a")
+                .cloned();
+
+            let value = argument.unwrap().value;
+            let mut answer = "回答です。".to_string();
+            answer.push_str(value.as_str().unwrap());
+
+            bot.messages
+                .lock()
+                .await
+                .push(ChatCompletionMessage::new(Role::User, answer));
+
+            let response = bot
+                .openai_client
+                .send_request(&bot.messages.lock().await)
+                .await;
+
+            if let Ok(res) = response {
+                bot.messages
+                    .lock()
+                    .await
+                    .push(ChatCompletionMessage::new(Role::Assistant, res.to_string()));
+
+                respond_to_command(&ctx, &command, res).await;
+            } else {
+                respond_to_command(
+                    &ctx,
+                    &command,
+                    "APIの返却値取得においてエラーが発生しました".to_string(),
+                )
+                .await;
+            }
+        }
+        "giveup" => {
+            bot.messages.lock().await.push(ChatCompletionMessage::new(
+                Role::User,
+                "ギブアップです。".to_string(),
+            ));
+
+            let response = bot
+                .openai_client
+                .send_request(&bot.messages.lock().await)
+                .await;
+
+            if let Ok(res) = response {
+                respond_to_command(&ctx, &command, res).await;
+            } else {
+                respond_to_command(
+                    &ctx,
+                    &command,
+                    "APIの返却値取得においてエラーが発生しました".to_string(),
+                )
+                .await;
+            }
         }
         _ => {}
     };
