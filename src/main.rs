@@ -110,9 +110,7 @@ impl EventHandler for Bot {
                     .max_length(100)
                     .required(true),
                 ),
-            CreateCommand::new("status").description(
-                "出題中の問題、今までに出た質問と回答を表示します。あなただけに表示されます",
-            ),
+            CreateCommand::new("status").description("出題文の確認など（あなただけに表示）"),
             CreateCommand::new("giveup").description("ゲームを終了します"),
         ];
 
