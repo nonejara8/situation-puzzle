@@ -4,18 +4,21 @@ mod handlers;
 use tokio::sync::Mutex;
 
 use anyhow::Context as _;
-use serenity::all::{CommandInteraction, ComponentInteraction, GuildId, Interaction, UserId};
+use serenity::all::{
+    CommandInteraction, ComponentInteraction, CreateEmbedFooter, CreateMessage, GuildId,
+    Interaction, UserId,
+};
 use serenity::async_trait;
 use serenity::builder::{
-    CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
-    CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
+    CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateEmbed,
+    CreateInteractionResponse, CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
 };
-
 use serenity::model::application::ButtonStyle;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use shuttle_runtime::SecretStore;
+use std::collections::HashMap;
 use tracing::info;
 
 use crate::api::{ChatCompletionMessage, OpenAIClient, Role};
@@ -24,6 +27,7 @@ struct Bot {
     join_users: Mutex<Vec<UserId>>,
     // openai_api_key: String,
     openai_client: OpenAIClient,
+    scores: Mutex<HashMap<String, u32>>,
     messages: Mutex<Vec<ChatCompletionMessage>>,
 }
 
@@ -35,6 +39,7 @@ impl Bot {
             discord_guild_id,
             join_users: Mutex::new(vec![]),
             openai_client: OpenAIClient::new(openai_api_key),
+            scores: Mutex::new(HashMap::new()),
             messages: Mutex::new(vec![ChatCompletionMessage::new(
                 Role::System,
                 r#"あなたはウミガメのスープクイズのゲームマスター（出題者）です。
@@ -247,7 +252,61 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
                     .await
                     .push(ChatCompletionMessage::new(Role::Assistant, res.to_string()));
 
-                respond_to_command(&ctx, &command, res).await;
+                if res.starts_with("正解です。") {
+                    let next_button = CreateButton::new("next_button")
+                        .label("次の問題に進む")
+                        .style(ButtonStyle::Primary);
+
+                    let cancel_button = CreateButton::new("cancel_button")
+                        .label("終了する")
+                        .style(ButtonStyle::Danger);
+
+                    let action_row = CreateActionRow::Buttons(vec![next_button, cancel_button]);
+
+                    let display_name = match command.user.global_name.clone() {
+                        Some(name) => name,
+                        None => command.user.name.clone(),
+                    };
+                    let mut scores = bot.scores.lock().await;
+
+                    if scores.contains_key(&display_name) {
+                        let score = scores.get_mut(&display_name).unwrap();
+                        *score += 1;
+                    } else {
+                        scores.insert(display_name.clone(), 1);
+                    }
+
+                    let mut message = "おめでとうございます🎉\n".to_string();
+                    message.push_str(&format!("{}さん　正解です！\n\n", command.user.mention()));
+
+                    message.push_str("問題のストーリー\n");
+                    message.push_str(&res.split("正解です。").nth(1).unwrap());
+
+                    let mut sorted_scores: Vec<_> = scores.iter().collect();
+                    sorted_scores.sort_by(|a, b| b.1.cmp(a.1));
+
+                    let fields: Vec<(String, String, bool)> = sorted_scores
+                        .iter()
+                        .map(|(user, score)| ((*user).clone(), format!("{}問正解", score), false))
+                        .collect();
+
+                    let embed = CreateEmbed::new()
+                        .color(0x00ff00)
+                        .description(message)
+                        .fields(fields);
+
+                    let builder = CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .embeds(vec![embed])
+                            .components(vec![action_row]),
+                    );
+
+                    if let Err(e) = command.create_response(&ctx.http, builder).await {
+                        println!("Error sending interaction response: {:?}", e);
+                    }
+                } else {
+                    respond_to_command(&ctx, &command, res).await;
+                }
             } else {
                 respond_to_command(
                     &ctx,
@@ -295,8 +354,8 @@ async fn respond_to_command(ctx: &Context, command: &CommandInteraction, respons
 
 async fn handle_component(ctx: Context, component: ComponentInteraction) {
     let response_content = match component.data.custom_id.as_str() {
-        "button_1" => "ボタン1が押されました",
-        "button_2" => "ボタン2が押されました",
+        "next_button" => "次の問題に進みます",
+        "cancel_button" => "ゲームを終了します",
         _ => "未知のボタンが押されました",
     };
 
