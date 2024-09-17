@@ -71,7 +71,10 @@ impl OpenAIClient {
                 .get("message")
                 .unwrap()
                 .get("content")
-                .unwrap();
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .replace("\"", "");
             Ok(message.to_string())
         } else {
             Err(anyhow::anyhow!(
