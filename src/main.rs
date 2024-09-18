@@ -3,30 +3,12 @@ mod config;
 mod handlers;
 mod models;
 
-use tokio::sync::Mutex;
-
-use anyhow::Context as _;
-use serenity::all::{
-    CommandInteraction, ComponentInteraction, CreateEmbedFooter, CreateMessage, GuildId,
-    Interaction, UserId,
-};
-use serenity::async_trait;
-use serenity::builder::{
-    CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateEmbed,
-    CreateInteractionResponse, CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
-};
-use serenity::model::application::ButtonStyle;
-use serenity::model::channel::Message;
-use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use shuttle_runtime::SecretStore;
-use std::collections::HashMap;
-use tracing::info;
-
-use crate::api::{ChatCompletionMessage, OpenAIClient, Role};
 
 use crate::config::Config;
 
+use crate::handlers::Bot;
 
 #[shuttle_runtime::main]
 async fn serenity(
