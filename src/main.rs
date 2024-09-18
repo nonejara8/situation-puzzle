@@ -123,6 +123,7 @@ impl EventHandler for Bot {
                     .max_length(100)
                     .required(true),
                 ),
+            CreateCommand::new("status").description("出題文の確認など（あなただけに表示）"),
             CreateCommand::new("giveup").description("ゲームを終了します"),
         ];
 
@@ -324,6 +325,9 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
                 .await;
             }
         }
+        "status" => {
+            respond_to_command_ephemeral(&ctx, &command, "sample sample".to_string()).await;
+        }
         "giveup" => {
             bot.messages.lock().await.push(ChatCompletionMessage::new(
                 Role::User,
@@ -352,6 +356,22 @@ async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
 
 async fn respond_to_command(ctx: &Context, command: &CommandInteraction, response_content: String) {
     let data = CreateInteractionResponseMessage::new().content(response_content);
+    let builder = CreateInteractionResponse::Message(data);
+
+    if let Err(why) = command.create_response(&ctx.http, builder).await {
+        println!("Cannot respond to slash command: {}", why);
+        println!("command.data: {:?}", command.data);
+    }
+}
+
+async fn respond_to_command_ephemeral(
+    ctx: &Context,
+    command: &CommandInteraction,
+    response_content: String,
+) {
+    let data = CreateInteractionResponseMessage::new()
+        .content(response_content)
+        .ephemeral(true);
     let builder = CreateInteractionResponse::Message(data);
 
     if let Err(why) = command.create_response(&ctx.http, builder).await {
