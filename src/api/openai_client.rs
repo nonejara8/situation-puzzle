@@ -1,40 +1,15 @@
-use anyhow::Error;
-use reqwest::{Client, Method, RequestBuilder};
-use serde::{Deserialize, Serialize};
+use reqwest::Client;
 use serde_json::{json, Value};
-const API_URL_V1: &str = "https://api.openai.com/v1";
+
+use crate::models::ChatCompletionMessage;
 
 pub struct OpenAIClient {
     pub api_key: String,
-    pub api_base: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Role {
-    User,
-    Assistant,
-    System,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ChatCompletionMessage {
-    pub role: Role,
-    pub content: String,
-}
-
-impl ChatCompletionMessage {
-    pub fn new(role: Role, content: String) -> Self {
-        Self { role, content }
-    }
 }
 
 impl OpenAIClient {
     pub fn new(api_key: String) -> Self {
-        Self {
-            api_key,
-            api_base: API_URL_V1.to_string(),
-        }
+        Self { api_key }
     }
 
     pub async fn send_request(
