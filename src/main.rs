@@ -1,4 +1,5 @@
 mod api;
+mod config;
 mod handlers;
 
 use tokio::sync::Mutex;
@@ -23,33 +24,20 @@ use tracing::info;
 
 use crate::api::{ChatCompletionMessage, OpenAIClient, Role};
 
+use crate::config::Config;
 
 
 #[shuttle_runtime::main]
 async fn serenity(
     #[shuttle_runtime::Secrets] secrets: SecretStore,
 ) -> shuttle_serenity::ShuttleSerenity {
-    // Get the discord token set in `Secrets.toml`
-    let token = secrets
-        .get("DISCORD_TOKEN")
-        .context("'DISCORD_TOKEN' was not found")?;
+    let config = Config::from_secrets(&secrets).await;
 
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
 
-    let discord_guild_id = secrets
-        .get("DISCORD_GUILD_ID")
-        .context("'DISCORD_GUILD_ID' was not found")?;
-
-    let openai_api_key = secrets
-        .get("OPENAI_API_KEY")
-        .context("'OPENAI_API_KEY' was not found")?;
-
-    let client = Client::builder(&token, intents)
-        .event_handler(Bot::new(
-            GuildId::new(discord_guild_id.parse::<u64>().unwrap()),
-            openai_api_key.to_string(),
-        ))
+    let client = Client::builder(&config.discord_token, intents)
+        .event_handler(Bot::new(config.discord_guild_id, config.openai_api_key))
         .await
         .expect("Err creating client");
 
