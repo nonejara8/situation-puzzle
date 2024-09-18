@@ -1,6 +1,7 @@
 mod api;
 mod config;
 mod handlers;
+mod models;
 
 use tokio::sync::Mutex;
 
