@@ -1,12 +1,12 @@
+use crate::models::{ChatCompletionMessage, Role};
 use serenity::all::CommandInteraction;
 use serenity::builder::{
     CreateActionRow, CreateButton, CreateEmbed, CreateInteractionResponse,
     CreateInteractionResponseMessage,
 };
 use serenity::model::application::ButtonStyle;
+use serenity::model::user::User;
 use serenity::prelude::*;
-
-use crate::models::{ChatCompletionMessage, Role};
 
 use crate::handlers::Bot;
 
@@ -123,53 +123,7 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
                     .push(ChatCompletionMessage::new(Role::Assistant, res.to_string()));
 
                 if res.starts_with("正解です。") {
-                    let next_button = CreateButton::new("next_button")
-                        .label("次の問題に進む")
-                        .style(ButtonStyle::Primary);
-
-                    let cancel_button = CreateButton::new("cancel_button")
-                        .label("終了する")
-                        .style(ButtonStyle::Danger);
-
-                    let action_row = CreateActionRow::Buttons(vec![next_button, cancel_button]);
-
-                    let display_name = match command.user.global_name.clone() {
-                        Some(name) => name,
-                        None => command.user.name.clone(),
-                    };
-                    let mut scores = bot.scores.lock().await;
-
-                    if scores.contains_key(&display_name) {
-                        let score = scores.get_mut(&display_name).unwrap();
-                        *score += 1;
-                    } else {
-                        scores.insert(display_name.clone(), 1);
-                    }
-
-                    let mut message = "おめでとうございます🎉\n".to_string();
-                    message.push_str(&format!("{}さん　正解です！\n\n", command.user.mention()));
-
-                    message.push_str("問題のストーリー\n");
-                    message.push_str(&res.split("正解です。").nth(1).unwrap());
-
-                    let mut sorted_scores: Vec<_> = scores.iter().collect();
-                    sorted_scores.sort_by(|a, b| b.1.cmp(a.1));
-
-                    let fields: Vec<(String, String, bool)> = sorted_scores
-                        .iter()
-                        .map(|(user, score)| ((*user).clone(), format!("{}問正解", score), false))
-                        .collect();
-
-                    let embed = CreateEmbed::new()
-                        .color(0x00ff00)
-                        .description(message)
-                        .fields(fields);
-
-                    let builder = CreateInteractionResponse::Message(
-                        CreateInteractionResponseMessage::new()
-                            .embeds(vec![embed])
-                            .components(vec![action_row]),
-                    );
+                    let builder = create_result_message(&command.user, &res, bot).await;
 
                     if let Err(e) = command.create_response(&ctx.http, builder).await {
                         println!("Error sending interaction response: {:?}", e);
@@ -210,6 +164,60 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
         }
         _ => {}
     };
+}
+
+async fn create_result_message(
+    user: &User,
+    description: &str,
+    bot: &Bot,
+) -> CreateInteractionResponse {
+    let next_button = CreateButton::new("next_button")
+        .label("次の問題に進む")
+        .style(ButtonStyle::Primary);
+
+    let cancel_button = CreateButton::new("cancel_button")
+        .label("終了する")
+        .style(ButtonStyle::Danger);
+
+    let action_row = CreateActionRow::Buttons(vec![next_button, cancel_button]);
+
+    let display_name = match user.global_name.clone() {
+        Some(name) => name,
+        None => user.name.clone(),
+    };
+
+    let mut scores = bot.scores.lock().await;
+
+    if scores.contains_key(&display_name) {
+        let score = scores.get_mut(&display_name).unwrap();
+        *score += 1;
+    } else {
+        scores.insert(display_name.clone(), 1);
+    }
+
+    let mut message = "おめでとうございます🎉\n".to_string();
+    message.push_str(&format!("{}さん　正解です！\n\n", user.mention()));
+    message.push_str("問題のストーリー\n");
+    message.push_str(description);
+
+    let mut sorted_scores: Vec<_> = scores.iter().collect();
+    sorted_scores.sort_by(|a, b| b.1.cmp(a.1));
+
+    let fields: Vec<(String, String, bool)> = sorted_scores
+        .iter()
+        .map(|(user, score)| ((*user).clone(), format!("{}問正解", score), false))
+        .collect();
+
+    let embed = CreateEmbed::new()
+        .color(0x00ff00)
+        .description(message)
+        .fields(fields);
+
+    CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new()
+            .embeds(vec![embed])
+            .components(vec![action_row]),
+    )
 }
 
 async fn respond_to_command(ctx: &Context, command: &CommandInteraction, response_content: String) {
