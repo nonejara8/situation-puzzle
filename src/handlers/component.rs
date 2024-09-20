@@ -1,4 +1,4 @@
-use serenity::all::{ComponentInteraction, CreateMessage};
+use serenity::all::ComponentInteraction;
 use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
 use serenity::prelude::*;
 
