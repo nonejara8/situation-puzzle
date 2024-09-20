@@ -123,7 +123,7 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
                     .push(ChatCompletionMessage::new(Role::Assistant, res.to_string()));
 
                 if res.starts_with("正解です。") {
-                    let builder = create_result_message(&command.user, &res, bot).await;
+                    let builder = create_result_message(&command.user, &res, bot, false).await;
 
                     if let Err(e) = command.create_response(&ctx.http, builder).await {
                         println!("Error sending interaction response: {:?}", e);
@@ -152,7 +152,16 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
                 .await;
 
             if let Ok(res) = response {
-                respond_to_command(&ctx, &command, res).await;
+                bot.messages
+                    .lock()
+                    .await
+                    .push(ChatCompletionMessage::new(Role::Assistant, res.to_string()));
+
+                let builder = create_result_message(&command.user, &res, bot, true).await;
+
+                if let Err(e) = command.create_response(&ctx.http, builder).await {
+                    println!("Error sending interaction response: {:?}", e);
+                }
             } else {
                 respond_to_command(
                     &ctx,
@@ -170,6 +179,7 @@ async fn create_result_message(
     user: &User,
     description: &str,
     bot: &Bot,
+    is_giveup: bool,
 ) -> CreateInteractionResponse {
     let next_button = CreateButton::new("next_button")
         .label("次の問題に進む")
@@ -181,24 +191,31 @@ async fn create_result_message(
 
     let action_row = CreateActionRow::Buttons(vec![next_button, cancel_button]);
 
+    // giveupかanswerか
+    let mut message = if is_giveup {
+        "残念、ギブアップです😢\n".to_string()
+    } else {
+        format!(
+            "おめでとうございます🎉\n{}さん正解です！\n\n",
+            user.mention()
+        )
+    };
+    message.push_str(&format!("問題のストーリー\n{}", description));
+
     let display_name = match user.global_name.clone() {
         Some(name) => name,
         None => user.name.clone(),
     };
 
     let mut scores = bot.scores.lock().await;
-
-    if scores.contains_key(&display_name) {
-        let score = scores.get_mut(&display_name).unwrap();
-        *score += 1;
-    } else {
-        scores.insert(display_name.clone(), 1);
+    if !is_giveup {
+        if scores.contains_key(&display_name) {
+            let score = scores.get_mut(&display_name).unwrap();
+            *score += 1;
+        } else {
+            scores.insert(display_name.clone(), 1);
+        }
     }
-
-    let mut message = "おめでとうございます🎉\n".to_string();
-    message.push_str(&format!("{}さん　正解です！\n\n", user.mention()));
-    message.push_str("問題のストーリー\n");
-    message.push_str(description);
 
     let mut sorted_scores: Vec<_> = scores.iter().collect();
     sorted_scores.sort_by(|a, b| b.1.cmp(a.1));
@@ -208,10 +225,11 @@ async fn create_result_message(
         .map(|(user, score)| ((*user).clone(), format!("{}問正解", score), false))
         .collect();
 
-    let embed = CreateEmbed::new()
-        .color(0x00ff00)
-        .description(message)
-        .fields(fields);
+    let mut embed = CreateEmbed::new().color(0x00ff00).description(message);
+
+    if !fields.is_empty() {
+        embed = embed.fields(fields);
+    }
 
     CreateInteractionResponse::Message(
         CreateInteractionResponseMessage::new()
