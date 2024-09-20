@@ -129,7 +129,7 @@ impl EventHandler for Bot {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         match interaction {
             Interaction::Command(command) => handle_command(ctx, command, self).await,
-            Interaction::Component(component) => handle_component(ctx, component).await,
+            Interaction::Component(component) => handle_component(ctx, component, self).await,
             _ => (),
         }
     }
