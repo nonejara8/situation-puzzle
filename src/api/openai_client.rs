@@ -13,7 +13,7 @@ impl OpenAIClient {
     pub fn new(api_key: String) -> Self {
         Self {
             api_key,
-            system_prompt: ChatCompletionMessage::new(Role::System, SYSTEM_PROMPT),
+            system_prompt: ChatCompletionMessage::new(Role::System, SYSTEM_PROMPT.to_string()),
         }
     }
 
