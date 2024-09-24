@@ -44,17 +44,6 @@ impl Bot {
         }
     }
 
-    pub async fn initialize(&self) {
-        self.set_state(State::Idle).await;
-        self.reset_scores().await;
-        self.reset_messages().await;
-    }
-
-    pub async fn set_state(&self, new_state: State) {
-        let mut state = self.state.lock().await;
-        *state = new_state;
-    }
-
     pub async fn reset_scores(&self) {
         self.scores.lock().await.clear();
     }

@@ -28,7 +28,8 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
             respond_to_command(&ctx, &command, response_content).await;
         }
         "play" => {
-            if !matches!(*bot.state.lock().await, State::Idle) {
+            let mut state = bot.state.lock().await;
+            if !matches!(*state, State::Idle) {
                 respond_to_command_ephemeral(
                     &ctx,
                     &command,
@@ -43,10 +44,11 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
                 println!("command.data: {:?}", command.data);
                 return;
             }
-            bot.set_state(State::Playing).await;
+            *state = State::Playing;
         }
         "question" => {
-            if !matches!(*bot.state.lock().await, State::Playing) {
+            let state = bot.state.lock().await;
+            if !matches!(*state, State::Playing) {
                 respond_to_command_ephemeral(
                     &ctx,
                     &command,
@@ -93,7 +95,8 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
             }
         }
         "answer" => {
-            if !matches!(*bot.state.lock().await, State::Playing) {
+            let mut state = bot.state.lock().await;
+            if !matches!(*state, State::Playing) {
                 respond_to_command_ephemeral(
                     &ctx,
                     &command,
@@ -137,7 +140,7 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
                         return;
                     }
 
-                    bot.set_state(State::Waiting).await;
+                    *state = State::Waiting;
                 } else {
                     respond_to_command(&ctx, &command, res).await;
                 }
@@ -151,7 +154,8 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
             }
         }
         "giveup" => {
-            if !matches!(*bot.state.lock().await, State::Playing) {
+            let mut state = bot.state.lock().await;
+            if !matches!(*state, State::Playing) {
                 respond_to_command_ephemeral(
                     &ctx,
                     &command,
@@ -160,7 +164,7 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
                 .await;
                 return;
             }
-            bot.set_state(State::Waiting).await;
+            *state = State::Waiting;
 
             bot.messages.lock().await.push(ChatCompletionMessage::new(
                 Role::User,
