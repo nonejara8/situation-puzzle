@@ -16,7 +16,7 @@ use serenity::prelude::*;
 
 use crate::constants::prompt::SYSTEM_PROMPT;
 use crate::handlers::{handle_command, handle_component, handle_message};
-use crate::models::Role;
+use crate::models::{Role, State};
 
 pub struct Bot {
     pub discord_guild_id: GuildId,
@@ -25,6 +25,7 @@ pub struct Bot {
     pub scores: Mutex<HashMap<String, u32>>,
     pub messages: Mutex<Vec<ChatCompletionMessage>>,
     pub system_prompt: ChatCompletionMessage,
+    pub state: Mutex<State>,
 }
 
 impl Bot {
@@ -37,13 +38,20 @@ impl Bot {
             openai_client: OpenAIClient::new(openai_api_key),
             scores: Mutex::new(HashMap::new()),
             messages: Mutex::new(vec![system_prompt.clone()]),
-            system_prompt: system_prompt,
+            system_prompt,
+            state: Mutex::new(State::Idle),
         }
     }
 
     pub async fn initialize(&self) {
+        self.set_state(State::Idle).await;
         self.reset_scores().await;
         self.reset_messages().await;
+    }
+
+    pub async fn set_state(&self, new_state: State) {
+        let mut state = self.state.lock().await;
+        *state = new_state;
     }
 
     pub async fn reset_scores(&self) {
