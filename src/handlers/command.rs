@@ -1,4 +1,4 @@
-use crate::models::{ChatCompletionMessage, Role};
+use crate::models::{ChatCompletionMessage, Role, State};
 use serenity::all::CommandInteraction;
 use serenity::builder::{
     CreateActionRow, CreateButton, CreateEmbed, CreateInteractionResponse,
@@ -28,14 +28,33 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
             respond_to_command(&ctx, &command, response_content).await;
         }
         "play" => {
-            bot.initialize().await;
+            if !matches!(*bot.state.lock().await, State::Idle) {
+                respond_to_command_ephemeral(
+                    &ctx,
+                    &command,
+                    "実行するタイミングが正しくありません".to_string(),
+                )
+                .await;
+                return;
+            }
             let builder = generate_question_builder(bot).await;
             if let Err(why) = command.create_response(&ctx.http, builder).await {
                 println!("Cannot respond to slash command: {}", why);
                 println!("command.data: {:?}", command.data);
+                return;
             }
+            bot.set_state(State::Playing).await;
         }
         "question" => {
+            if !matches!(*bot.state.lock().await, State::Playing) {
+                respond_to_command_ephemeral(
+                    &ctx,
+                    &command,
+                    "実行するタイミングが正しくありません".to_string(),
+                )
+                .await;
+                return;
+            }
             let argument = command
                 .data
                 .options
@@ -74,6 +93,15 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
             }
         }
         "answer" => {
+            if !matches!(*bot.state.lock().await, State::Playing) {
+                respond_to_command_ephemeral(
+                    &ctx,
+                    &command,
+                    "実行するタイミングが正しくありません".to_string(),
+                )
+                .await;
+                return;
+            }
             let argument = command
                 .data
                 .options
@@ -106,7 +134,10 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
 
                     if let Err(e) = command.create_response(&ctx.http, builder).await {
                         println!("Error sending interaction response: {:?}", e);
+                        return;
                     }
+
+                    bot.set_state(State::Waiting).await;
                 } else {
                     respond_to_command(&ctx, &command, res).await;
                 }
@@ -120,6 +151,17 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
             }
         }
         "giveup" => {
+            if !matches!(*bot.state.lock().await, State::Playing) {
+                respond_to_command_ephemeral(
+                    &ctx,
+                    &command,
+                    "実行するタイミングが正しくありません".to_string(),
+                )
+                .await;
+                return;
+            }
+            bot.set_state(State::Waiting).await;
+
             bot.messages.lock().await.push(ChatCompletionMessage::new(
                 Role::User,
                 "ギブアップです。".to_string(),
@@ -219,6 +261,22 @@ async fn create_result_message(
 
 async fn respond_to_command(ctx: &Context, command: &CommandInteraction, response_content: String) {
     let data = CreateInteractionResponseMessage::new().content(response_content);
+    let builder = CreateInteractionResponse::Message(data);
+
+    if let Err(why) = command.create_response(&ctx.http, builder).await {
+        println!("Cannot respond to slash command: {}", why);
+        println!("command.data: {:?}", command.data);
+    }
+}
+
+async fn respond_to_command_ephemeral(
+    ctx: &Context,
+    command: &CommandInteraction,
+    response_content: String,
+) {
+    let data = CreateInteractionResponseMessage::new()
+        .content(response_content)
+        .ephemeral(true);
     let builder = CreateInteractionResponse::Message(data);
 
     if let Err(why) = command.create_response(&ctx.http, builder).await {
