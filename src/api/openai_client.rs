@@ -1,6 +1,7 @@
 use reqwest::Client;
 use serde_json::{json, Value};
 
+use crate::models::ChatCompletionMessage;
 
 pub struct OpenAIClient {
     pub api_key: String,
@@ -8,6 +9,7 @@ pub struct OpenAIClient {
 
 impl OpenAIClient {
     pub fn new(api_key: String) -> Self {
+        Self { api_key }
     }
 
     pub async fn send_request(
