@@ -19,6 +19,7 @@ impl OpenAIClient {
         let client = Client::new();
         let body = json!({
             "model": "gpt-4o-mini",
+            "messages": messages,
         });
 
         let request = client
