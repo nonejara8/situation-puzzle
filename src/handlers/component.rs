@@ -21,7 +21,14 @@ async fn next_button(component: ComponentInteraction, ctx: Context, bot: &Bot) {
     }
 }
 
-async fn finish_button(component: ComponentInteraction, ctx: Context, bot: &Bot) {}
+async fn finish_button(component: ComponentInteraction, ctx: Context, bot: &Bot) {
+    let finish_msg = CreateInteractionResponseMessage::new().content("ゲームを終了します");
+    let builder = CreateInteractionResponse::Message(finish_msg);
+    if let Err(why) = component.create_response(&ctx.http, builder).await {
+        println!("Cannot respond to component interaction: {}", why);
+    }
+    bot.initialize().await;
+}
 
 async fn unknown_component(component: ComponentInteraction, ctx: Context) -> () {
     let msg: &str = "未知のコンポーネントが呼ばれました";
