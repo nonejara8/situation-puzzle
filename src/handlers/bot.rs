@@ -14,7 +14,9 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 
+use crate::constants::prompt::SYSTEM_PROMPT;
 use crate::handlers::{handle_command, handle_component, handle_message};
+use crate::models::Role;
 
 pub struct Bot {
     pub discord_guild_id: GuildId,
@@ -22,17 +24,35 @@ pub struct Bot {
     pub openai_client: OpenAIClient,
     pub scores: Mutex<HashMap<String, u32>>,
     pub messages: Mutex<Vec<ChatCompletionMessage>>,
+    pub system_prompt: ChatCompletionMessage,
 }
 
 impl Bot {
     pub fn new(discord_guild_id: GuildId, openai_api_key: String) -> Self {
+        let system_prompt = ChatCompletionMessage::new(Role::System, SYSTEM_PROMPT.to_string());
+
         Self {
             discord_guild_id,
             join_users: Mutex::new(vec![]),
             openai_client: OpenAIClient::new(openai_api_key),
             scores: Mutex::new(HashMap::new()),
-            messages: Mutex::new(vec![]),
+            messages: Mutex::new(vec![system_prompt.clone()]),
+            system_prompt: system_prompt,
         }
+    }
+
+    pub async fn initialize(&self) {
+        self.reset_scores().await;
+        self.reset_messages().await;
+    }
+
+    pub async fn reset_scores(&self) {
+        self.scores.lock().await.clear();
+    }
+
+    pub async fn reset_messages(&self) {
+        self.messages.lock().await.clear();
+        self.messages.lock().await.push(self.system_prompt.clone());
     }
 }
 
