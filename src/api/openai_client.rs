@@ -40,17 +40,13 @@ impl OpenAIClient {
         if status.is_success() {
             let message = json
                 .get("choices")
-                .unwrap()
-                .get(0)
-                .unwrap()
-                .get("message")
-                .unwrap()
-                .get("content")
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .replace("\"", "");
-            Ok(message.to_string())
+                .and_then(|choices| choices.get(0))
+                .and_then(|choice| choice.get("message"))
+                .and_then(|message| message.get("content"))
+                .and_then(|content| content.as_str())
+                .ok_or_else(|| anyhow::anyhow!("レスポンスの形式が意図したものではありません"))?
+                .to_string();
+            Ok(message)
         } else {
             Err(anyhow::anyhow!(
                 "エラーが発生しました: ステータスコード {}",
