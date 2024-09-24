@@ -9,6 +9,7 @@ use serenity::model::user::User;
 use serenity::prelude::*;
 
 use crate::handlers::Bot;
+use crate::utils::question_generator::generate_question_builder;
 
 pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot) {
     match command.data.name.as_str() {
@@ -27,33 +28,11 @@ pub async fn handle_command(ctx: Context, command: CommandInteraction, bot: &Bot
             respond_to_command(&ctx, &command, response_content).await;
         }
         "play" => {
-            bot.messages.lock().await.push(ChatCompletionMessage::new(
-                Role::User,
-                "新しい問題を出題してください。".to_string(),
-            ));
-            let response = bot
-                .openai_client
-                .send_request(&bot.messages.lock().await)
-                .await;
-
-            let mut message = "問題です\n".to_string();
-
-            if let Ok(res) = response {
-                bot.messages
-                    .lock()
-                    .await
-                    .push(ChatCompletionMessage::new(Role::Assistant, res.to_string()));
-
-                message.push_str(&res);
-
-                respond_to_command(&ctx, &command, message).await;
-            } else {
-                respond_to_command(
-                    &ctx,
-                    &command,
-                    "APIの返却値取得においてエラーが発生しました".to_string(),
-                )
-                .await;
+            bot.initialize().await;
+            let builder = generate_question_builder(bot).await;
+            if let Err(why) = command.create_response(&ctx.http, builder).await {
+                println!("Cannot respond to slash command: {}", why);
+                println!("command.data: {:?}", command.data);
             }
         }
         "question" => {

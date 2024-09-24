@@ -3,6 +3,7 @@ mod config;
 mod constants;
 mod handlers;
 mod models;
+mod utils;
 
 use serenity::prelude::*;
 use shuttle_runtime::SecretStore;

@@ -3,7 +3,7 @@ use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMess
 use serenity::prelude::*;
 
 use crate::handlers::Bot;
-use crate::models::{ChatCompletionMessage, Role};
+use crate::utils::question_generator::generate_question_builder;
 
 pub async fn handle_component(ctx: Context, component: ComponentInteraction, bot: &Bot) {
     match component.data.custom_id.as_str() {
@@ -14,32 +14,10 @@ pub async fn handle_component(ctx: Context, component: ComponentInteraction, bot
 }
 
 async fn next_button(component: ComponentInteraction, ctx: Context, bot: &Bot) {
-    bot.messages.lock().await.push(ChatCompletionMessage::new(
-        Role::User,
-        "新しい問題を出題してください。".to_string(),
-    ));
-    let response = bot
-        .openai_client
-        .send_request(&bot.messages.lock().await)
-        .await;
-
-    let mut message = "問題です\n".to_string();
-
-    if let Ok(res) = response {
-        bot.messages
-            .lock()
-            .await
-            .push(ChatCompletionMessage::new(Role::Assistant, res.to_string()));
-
-        message.push_str(&res);
-
-        let builder = CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content(message),
-        );
-
-        if let Err(why) = component.create_response(&ctx.http, builder).await {
-            println!("Cannot respond to component interaction: {}", why);
-        }
+    let builder = generate_question_builder(bot).await;
+    if let Err(why) = component.create_response(&ctx.http, builder).await {
+        println!("Cannot respond to slash command: {}", why);
+        println!("command.data: {:?}", component.data);
     }
 }
 

@@ -1,20 +1,15 @@
 use reqwest::Client;
 use serde_json::{json, Value};
 
-use crate::constants::prompt::SYSTEM_PROMPT;
-use crate::models::{ChatCompletionMessage, Role};
+use crate::models::ChatCompletionMessage;
 
 pub struct OpenAIClient {
     pub api_key: String,
-    system_prompt: ChatCompletionMessage,
 }
 
 impl OpenAIClient {
     pub fn new(api_key: String) -> Self {
-        Self {
-            api_key,
-            system_prompt: ChatCompletionMessage::new(Role::System, SYSTEM_PROMPT.to_string()),
-        }
+        Self { api_key }
     }
 
     pub async fn send_request(
@@ -24,7 +19,7 @@ impl OpenAIClient {
         let client = Client::new();
         let body = json!({
             "model": "gpt-4o-mini",
-            "messages": [self.system_prompt, messages]
+            "messages": messages,
         });
 
         let request = client
