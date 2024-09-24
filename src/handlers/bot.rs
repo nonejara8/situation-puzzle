@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use serenity::all::{GuildId, Interaction, UserId};
@@ -26,7 +25,7 @@ pub struct Bot {
     pub scores: Mutex<HashMap<String, u32>>,
     pub messages: Mutex<Vec<ChatCompletionMessage>>,
     pub system_prompt: ChatCompletionMessage,
-    pub state: Arc<Mutex<State>>,
+    pub state: Mutex<State>,
 }
 
 impl Bot {
@@ -40,7 +39,7 @@ impl Bot {
             scores: Mutex::new(HashMap::new()),
             messages: Mutex::new(vec![system_prompt.clone()]),
             system_prompt,
-            state: Arc::new(Mutex::new(State::Idle)),
+            state: Mutex::new(State::Idle),
         }
     }
 
