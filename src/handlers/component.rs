@@ -15,7 +15,8 @@ pub async fn handle_component(ctx: Context, component: ComponentInteraction, bot
 }
 
 async fn next_button(component: ComponentInteraction, ctx: Context, bot: &Bot) {
-    if !matches!(*bot.state.lock().await, State::Waiting) {
+    let mut state = bot.state.lock().await;
+    if !matches!(*state, State::Waiting) {
         respond_to_component_ephemeral(
             &ctx,
             &component,
@@ -32,11 +33,12 @@ async fn next_button(component: ComponentInteraction, ctx: Context, bot: &Bot) {
         return;
     }
 
-    bot.set_state(State::Playing).await;
+    *state = State::Playing;
 }
 
 async fn finish_button(component: ComponentInteraction, ctx: Context, bot: &Bot) {
-    if !matches!(*bot.state.lock().await, State::Waiting) {
+    let mut state = bot.state.lock().await;
+    if !matches!(*state, State::Waiting) {
         respond_to_component_ephemeral(
             &ctx,
             &component,
@@ -47,7 +49,7 @@ async fn finish_button(component: ComponentInteraction, ctx: Context, bot: &Bot)
     }
 
     respond_to_component(&ctx, &component, "ゲームを終了します".to_string()).await;
-    bot.initialize().await;
+    *state = State::Idle;
 }
 
 async fn unknown_component(component: ComponentInteraction, ctx: Context) -> () {
