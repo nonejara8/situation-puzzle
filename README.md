@@ -1,30 +1,50 @@
-# Serenity Hello World Bot with Shuttle
+# ウミガメのスープBot
 
-In this example we will deploy a Serenity bot with Shuttle that responds to the `!hello` command with `world!`. To run this bot we need a valid Discord Token. To get started log in to the [Discord developer portal](https://discord.com/developers/applications).
+## 概要
 
-1. Click the New Application button, name your application and click Create.
-2. Navigate to the Bot tab in the lefthand menu, and add a new bot.
-3. On the bot page click the Reset Token button to reveal your token. Put this token in your `Secrets.toml`. It's very important that you don't reveal your token to anyone, as it can be abused. Create a `.gitignore` file to omit your `Secrets.toml` from version control.
-4. For the sake of this example, you also need to scroll down on the bot page to the Message Content Intent section and enable that option.
+このBotは、Discord上でウミガメのスープを楽しむためのBotです。
+Botが参加者の質問に答えたり、回答の正誤チェックをするので、GM不在でゲームを進めることが可能です。
 
-To add the bot to a server we need to create an invite link.
+## How to use（WIP）
+ローカルで立ち上げる場合
 
-1. On your bot's application page, open the OAuth2 page via the lefthand panel.
-2. Go to the URL Generator via the lefthand panel, and select the `bot` scope as well as the `Send Messages` permission in the Bot Permissions section.
-3. Copy the URL, open it in your browser and select a Discord server you wish to invite the bot to.
+### サーバーにBotを導入する
 
-For more information please refer to the [Discord docs](https://discord.com/developers/docs/getting-started) as well as the [Serenity repo](https://github.com/serenity-rs/serenity) for more examples.
+・・・
 
-## how to deploy
+### Botを作成する
 
-- デプロイ
-`cargo shuttle deploy`
+Discord Developer PortalでBotを作成する。
+https://discord.com/developers/applications
 
-- ローカルで実行
-`cargo shuttle run`
+New Applicationを押し、任意のアプリケーション名を入力する。
 
-## サーバーへの導入の仕方
+Bot > Token
+Reset Tokenを押し、表示されたトークンをコピーする。
+このTokenは他の人には教えない。
 
-## 参考
-### プロンプトエンジニアリング
-https://www.promptingguide.ai/
+OAuth2 > OAuth2 URL Generator
+SCOPESにあるチェックボックスの中からbotを選択する。
+
+BOT PERMISSIONSにあるチェックボックスの中から、Administratorを選択する。
+
+一番下のGENERATED URLにあるCOPYボタンを押し、URLをコピーする。
+
+1. .Secrets.toml.sampleを.Secrets.tomlにコピーして、各値を設定する
+   - **DISCORD_TOKEN**
+     - ddd
+   - **DISCORD_GUILD_ID**
+     - ユーザー設定（歯車アイコン） > 詳細設定 > 開発者モードをON
+     - 上部のサーバー名を右クリック > サーバーIDをコピー
+   - **OPENAI_API_KEY**
+
+
+### Rustの実行環境を整える
+
+- shuttleをインストールする
+  - `curl -sSfL https://www.shuttle.rs/install | bash
+`
+  - https://docs.shuttle.rs/getting-started/installation
+- `cargo shuttle run`でローカルでBotを起動する
+
+
